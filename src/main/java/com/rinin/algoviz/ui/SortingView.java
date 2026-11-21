@@ -68,6 +68,7 @@ public final class SortingView extends BorderPane {
         algorithmBox.setCellFactory(list -> new NameCell());
         algorithmBox.setButtonCell(new NameCell());
         algorithmBox.setPromptText("No algorithms yet");
+        algorithmBox.setPrefWidth(170);
         if (!algorithmBox.getItems().isEmpty()) {
             algorithmBox.getSelectionModel().selectFirst();
         }
@@ -89,6 +90,7 @@ public final class SortingView extends BorderPane {
         speedSlider.valueProperty().addListener((obs, old, now) -> updateSpeed());
 
         shuffleButton.setOnAction(e -> shuffle());
+        playButton.setMinWidth(80); // fixed so "Play"/"Resume" don't shift the toolbar
         playButton.setOnAction(e -> togglePlay());
         stepButton.setOnAction(e -> step());
 
