@@ -9,6 +9,7 @@ public final class SortingAlgorithms {
     public static List<SortingAlgorithm> all() {
         return List.of(
                 new BubbleSort(),
-                new MergeSort());
+                new MergeSort(),
+                new QuickSort());
     }
 }
