@@ -25,8 +25,8 @@ import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 
 /**
- * Grid editor and search animation. Drag to draw walls (right-drag erases),
- * and drag the green start or red end to move them.
+ * Grid editor and search animation. Drag to draw walls or weighted cells
+ * (right-drag erases), and drag the green start or red end to move them.
  */
 public final class PathfindingView extends BorderPane {
 
@@ -36,6 +36,25 @@ public final class PathfindingView extends BorderPane {
 
     private enum Drag { NONE, START, END, DRAW, ERASE }
 
+    /** What a left-drag paints. */
+    private enum Brush {
+        WALL("Brush: Wall"), WEIGHT("Brush: Weight ×" + WEIGHT_VALUE);
+
+        private final String label;
+
+        Brush(String label) {
+            this.label = label;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    /** Cost of stepping into a weighted cell (normal cells cost 1). */
+    private static final int WEIGHT_VALUE = 5;
+
     private static final int ROWS = 25;
     private static final int COLS = 45;
     private static final double RANDOM_WALL_DENSITY = 0.28;
@@ -43,6 +62,7 @@ public final class PathfindingView extends BorderPane {
     private static final Color BACKGROUND = Color.web("#0d1117");
     private static final Color EMPTY = Color.web("#161b22");
     private static final Color WALL = Color.web("#6e7681");
+    private static final Color WEIGHT = Color.web("#d29922");
     private static final Color FRONTIER = Color.web("#c77dff");
     private static final Color VISITED = Color.web("#3d2a5c");
     private static final Color PATH = Color.web("#f1e05a");
@@ -60,10 +80,12 @@ public final class PathfindingView extends BorderPane {
 
     private final Canvas canvas = new Canvas();
     private final ComboBox<PathfindingAlgorithm> algorithmBox = new ComboBox<>();
+    private final ComboBox<Brush> brushBox =
+            new ComboBox<>(FXCollections.observableArrayList(Brush.values()));
     private final Slider speedSlider = new Slider(0, 100, 35);
     private final Button runButton = new Button("Run");
     private final Button clearPathButton = new Button("Clear path");
-    private final Button clearWallsButton = new Button("Clear walls");
+    private final Button clearGridButton = new Button("Clear grid");
     private final Button randomButton = new Button("Random walls");
     private final Label statusLabel = new Label();
 
@@ -72,6 +94,7 @@ public final class PathfindingView extends BorderPane {
     private Cell lastPainted;
     private int visitedCount;
     private int pathCells;
+    private int pathCost;
     private boolean searched;
 
     private final StepPlayer<Step> player =
@@ -85,23 +108,25 @@ public final class PathfindingView extends BorderPane {
         algorithmBox.getSelectionModel().selectFirst();
         algorithmBox.valueProperty().addListener((obs, old, now) -> clearSearch());
 
-        speedSlider.setPrefWidth(160);
+        brushBox.getSelectionModel().select(Brush.WALL);
+
+        speedSlider.setPrefWidth(140);
         speedSlider.valueProperty().addListener((obs, old, now) -> updateSpeed());
 
         runButton.setMinWidth(70);
         runButton.setOnAction(e -> toggleRun());
         clearPathButton.setOnAction(e -> clearSearch());
-        clearWallsButton.setOnAction(e -> {
+        clearGridButton.setOnAction(e -> {
             clearSearch();
-            grid.clearWalls();
+            grid.clearAll();
             draw();
         });
         randomButton.setOnAction(e -> randomWalls());
 
         setTop(new ToolBar(
-                algorithmBox, new Separator(),
+                algorithmBox, brushBox, new Separator(),
                 new Label("Speed"), speedSlider, new Separator(),
-                runButton, clearPathButton, clearWallsButton, randomButton));
+                runButton, clearPathButton, clearGridButton, randomButton));
 
         Pane canvasHolder = new Pane(canvas);
         canvas.widthProperty().bind(canvasHolder.widthProperty());
@@ -110,7 +135,12 @@ public final class PathfindingView extends BorderPane {
         canvas.heightProperty().addListener(o -> draw());
         canvas.setOnMousePressed(this::onPress);
         canvas.setOnMouseDragged(this::onDrag);
-        canvas.setOnMouseReleased(e -> drag = Drag.NONE);
+        canvas.setOnMouseReleased(e -> {
+            // The last drag events can be merged away on a quick release,
+            // so finish the stroke at the release point too.
+            onDrag(e);
+            drag = Drag.NONE;
+        });
         setCenter(canvasHolder);
 
         statusLabel.setPadding(new Insets(6, 10, 6, 10));
@@ -174,6 +204,9 @@ public final class PathfindingView extends BorderPane {
             }
             case PATH -> {
                 state[c.row()][c.col()] = STATE_PATH;
+                if (pathCells > 0) {
+                    pathCost += grid.weight(c); // the start costs nothing
+                }
                 pathCells++;
             }
         }
@@ -187,7 +220,8 @@ public final class PathfindingView extends BorderPane {
 
     private void setEditingDisabled(boolean disabled) {
         algorithmBox.setDisable(disabled);
-        clearWallsButton.setDisable(disabled);
+        brushBox.setDisable(disabled);
+        clearGridButton.setDisable(disabled);
         randomButton.setDisable(disabled);
         clearPathButton.setDisable(disabled);
     }
@@ -200,6 +234,7 @@ public final class PathfindingView extends BorderPane {
         }
         visitedCount = 0;
         pathCells = 0;
+        pathCost = 0;
         searched = false;
         onFinished();
     }
@@ -232,7 +267,10 @@ public final class PathfindingView extends BorderPane {
         } else if (cell.equals(grid.end())) {
             drag = Drag.END;
         } else {
-            boolean erase = e.getButton() == MouseButton.SECONDARY || grid.isWall(cell);
+            // Pressing on a cell that already has the brush's content erases instead.
+            boolean filled = brushBox.getValue() == Brush.WALL
+                    ? grid.isWall(cell) : grid.weight(cell) > 1;
+            boolean erase = e.getButton() == MouseButton.SECONDARY || filled;
             drag = erase ? Drag.ERASE : Drag.DRAW;
             lastPainted = null;
             paint(cell);
@@ -268,7 +306,14 @@ public final class PathfindingView extends BorderPane {
             double t = steps == 0 ? 0 : (double) i / steps;
             int row = (int) Math.round(from.row() + t * (cell.row() - from.row()));
             int col = (int) Math.round(from.col() + t * (cell.col() - from.col()));
-            grid.setWall(new Cell(row, col), drag == Drag.DRAW);
+            Cell target = new Cell(row, col);
+            if (drag == Drag.ERASE) {
+                grid.setWall(target, false); // also resets the weight
+            } else if (brushBox.getValue() == Brush.WEIGHT) {
+                grid.setWeight(target, WEIGHT_VALUE);
+            } else {
+                grid.setWall(target, true);
+            }
         }
         lastPainted = cell;
     }
@@ -307,10 +352,19 @@ public final class PathfindingView extends BorderPane {
         }
         double ox = offsetX();
         double oy = offsetY();
+        double inset = Math.round(size * 0.3);
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
-                g.setFill(colorFor(new Cell(r, c)));
-                g.fillRect(ox + c * size + 1, oy + r * size + 1, size - 2, size - 2);
+                Cell cell = new Cell(r, c);
+                double x = ox + c * size;
+                double y = oy + r * size;
+                g.setFill(colorFor(cell));
+                g.fillRect(x + 1, y + 1, size - 2, size - 2);
+                if (grid.weight(cell) > 1 && !cell.equals(grid.start()) && !cell.equals(grid.end())) {
+                    // A smaller amber square so weights stay visible under the search colors.
+                    g.setFill(WEIGHT);
+                    g.fillRect(x + inset, y + inset, size - 2 * inset, size - 2 * inset);
+                }
             }
         }
         updateStatus();
@@ -338,15 +392,25 @@ public final class PathfindingView extends BorderPane {
         PathfindingAlgorithm a = algorithmBox.getValue();
         StringBuilder text = new StringBuilder(String.format("Visited: %,d", visitedCount));
         if (searched && !player.isRunning()) {
-            text.append(pathCells == 0 ? "   ·   No path" : "   ·   Path length: " + (pathCells - 1));
+            text.append(pathCells == 0 ? "   ·   No path"
+                    : "   ·   Path length: " + (pathCells - 1) + "   ·   Cost: " + pathCost);
         }
         if (a != null) {
-            text.append("   ·   ")
-                    .append(a.guaranteesShortestPath() ? "Always finds a shortest path" : "Path may not be shortest")
+            text.append("   ·   ").append(guarantee(a))
                     .append("   ·   Time ").append(a.timeComplexity())
                     .append("   ·   Space ").append(a.spaceComplexity());
         }
         statusLabel.setText(text.toString());
+    }
+
+    private String guarantee(PathfindingAlgorithm a) {
+        if (!a.guaranteesShortestPath()) {
+            return "Path may not be shortest";
+        }
+        if (!a.usesWeights() && grid.hasWeights()) {
+            return "Fewest steps, but ignores weights";
+        }
+        return "Always finds a shortest path";
     }
 
     private static final class NameCell extends ListCell<PathfindingAlgorithm> {

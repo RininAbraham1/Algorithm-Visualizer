@@ -5,7 +5,8 @@ import java.util.List;
 
 /**
  * A rectangular grid of open cells and walls, with a start and an end.
- * Movement is in four directions (no diagonals).
+ * Movement is in four directions (no diagonals). Each open cell has a
+ * weight: the cost of stepping into it (1 for normal cells).
  */
 public final class Grid {
     private static final int[][] DIRECTIONS = {{-1, 0}, {0, 1}, {1, 0}, {0, -1}};
@@ -13,6 +14,7 @@ public final class Grid {
     private final int rows;
     private final int cols;
     private final boolean[][] walls;
+    private final int[][] weights;
     private Cell start;
     private Cell end;
 
@@ -23,13 +25,18 @@ public final class Grid {
         this.rows = rows;
         this.cols = cols;
         this.walls = new boolean[rows][cols];
+        this.weights = new int[rows][cols];
+        for (int[] row : weights) {
+            java.util.Arrays.fill(row, 1);
+        }
         this.start = new Cell(rows / 2, cols / 4);
         this.end = new Cell(rows / 2, Math.max(cols * 3 / 4, cols / 4 + 1));
     }
 
     /**
      * Builds a grid from text, one string per row: {@code #} wall,
-     * {@code S} start, {@code E} end, anything else open. Handy in tests.
+     * {@code S} start, {@code E} end, {@code 2}-{@code 9} a cell with that
+     * weight, anything else open. Handy in tests.
      */
     public static Grid parse(String... lines) {
         Grid grid = new Grid(lines.length, lines[0].length());
@@ -39,6 +46,8 @@ public final class Grid {
                     case '#' -> grid.walls[r][c] = true;
                     case 'S' -> grid.start = new Cell(r, c);
                     case 'E' -> grid.end = new Cell(r, c);
+                    case '2', '3', '4', '5', '6', '7', '8', '9' ->
+                            grid.weights[r][c] = lines[r].charAt(c) - '0';
                     default -> { }
                 }
             }
@@ -51,6 +60,7 @@ public final class Grid {
         Grid copy = new Grid(rows, cols);
         for (int r = 0; r < rows; r++) {
             copy.walls[r] = walls[r].clone();
+            copy.weights[r] = weights[r].clone();
         }
         copy.start = start;
         copy.end = end;
@@ -73,18 +83,18 @@ public final class Grid {
         return end;
     }
 
-    /** Moves the start; ignored if the cell is the end. Clears any wall there. */
+    /** Moves the start; ignored if the cell is the end. Clears any wall or weight there. */
     public void setStart(Cell cell) {
         if (inBounds(cell) && !cell.equals(end)) {
-            walls[cell.row()][cell.col()] = false;
+            clear(cell);
             start = cell;
         }
     }
 
-    /** Moves the end; ignored if the cell is the start. Clears any wall there. */
+    /** Moves the end; ignored if the cell is the start. Clears any wall or weight there. */
     public void setEnd(Cell cell) {
         if (inBounds(cell) && !cell.equals(start)) {
-            walls[cell.row()][cell.col()] = false;
+            clear(cell);
             end = cell;
         }
     }
@@ -97,17 +107,61 @@ public final class Grid {
         return walls[cell.row()][cell.col()];
     }
 
-    /** Sets or clears a wall. The start and end can't become walls. */
+    /** Sets or clears a wall (which also resets the weight). The start and end can't become walls. */
     public void setWall(Cell cell, boolean wall) {
         if (!cell.equals(start) && !cell.equals(end)) {
             walls[cell.row()][cell.col()] = wall;
+            weights[cell.row()][cell.col()] = 1;
         }
     }
 
-    public void clearWalls() {
-        for (boolean[] row : walls) {
-            java.util.Arrays.fill(row, false);
+    /** Cost of stepping into {@code cell}. */
+    public int weight(Cell cell) {
+        return weights[cell.row()][cell.col()];
+    }
+
+    /** Makes {@code cell} an open cell with the given weight (at least 1). */
+    public void setWeight(Cell cell, int weight) {
+        if (weight < 1) {
+            throw new IllegalArgumentException("weight must be at least 1");
         }
+        if (!cell.equals(start) && !cell.equals(end)) {
+            walls[cell.row()][cell.col()] = false;
+            weights[cell.row()][cell.col()] = weight;
+        }
+    }
+
+    public boolean hasWeights() {
+        for (int[] row : weights) {
+            for (int w : row) {
+                if (w != 1) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Total cost of a path: the weight of every cell entered after the first. */
+    public int pathCost(List<Cell> path) {
+        int cost = 0;
+        for (int i = 1; i < path.size(); i++) {
+            cost += weight(path.get(i));
+        }
+        return cost;
+    }
+
+    /** Removes all walls and weights. */
+    public void clearAll() {
+        for (int r = 0; r < rows; r++) {
+            java.util.Arrays.fill(walls[r], false);
+            java.util.Arrays.fill(weights[r], 1);
+        }
+    }
+
+    private void clear(Cell cell) {
+        walls[cell.row()][cell.col()] = false;
+        weights[cell.row()][cell.col()] = 1;
     }
 
     /** Open cells next to {@code cell}, in the order up, right, down, left. */
