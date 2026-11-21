@@ -75,6 +75,7 @@ public final class SortingView extends BorderPane {
         algorithmBox.valueProperty().addListener((obs, old, now) -> reset());
 
         sizeSlider.setPrefWidth(160);
+        sizeLabel.setMinWidth(45); // room for "10000" so the toolbar doesn't shift
         sizeSlider.valueProperty().addListener((obs, old, now) -> {
             if (!sizeSlider.isValueChanging()) {
                 shuffle();
