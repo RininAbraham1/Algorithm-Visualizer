@@ -1,0 +1,23 @@
+.root {
+    -fx-font-family: "Segoe UI", "Ubuntu", sans-serif;
+    -fx-base: #161b22;
+    -fx-background: #0d1117;
+    -fx-control-inner-background: #161b22;
+    -fx-accent: #c77dff;
+    -fx-focus-color: #c77dff;
+    -fx-text-fill: #e6edf3;
+}
+
+.label {
+    -fx-text-fill: #e6edf3;
+}
+
+.tool-bar {
+    -fx-background-color: #161b22;
+    -fx-padding: 8 10 8 10;
+    -fx-spacing: 8;
+}
+
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: #0d1117;
+}

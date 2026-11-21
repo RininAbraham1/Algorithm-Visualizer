@@ -29,10 +29,10 @@ An interactive JavaFX tool to visualize core algorithms in real time — from so
 
 ```bash
 # Clone the repository
-git clone https://github.com/RininAbraham1/AlgorithmVisualizer.git
+git clone https://github.com/RininAbraham1/algorithm-visualizer.git
 
 # Navigate into the project
-cd AlgorithmVisualizer
+cd algorithm-visualizer
 
 # Run (if using Maven)
 mvn javafx:run
