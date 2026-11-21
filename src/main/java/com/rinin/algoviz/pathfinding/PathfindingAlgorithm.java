@@ -11,8 +11,16 @@ public interface PathfindingAlgorithm {
 
     String spaceComplexity();
 
-    /** Whether the path found is always a shortest one. */
+    /**
+     * Whether the path found is always a shortest one: lowest total cost if
+     * {@link #usesWeights()}, otherwise fewest steps.
+     */
     boolean guaranteesShortestPath();
+
+    /** Whether the algorithm takes cell weights into account. */
+    default boolean usesWeights() {
+        return false;
+    }
 
     /**
      * Searches from the grid's start to its end.

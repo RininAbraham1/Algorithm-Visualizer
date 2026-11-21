@@ -48,4 +48,28 @@ class GridTest {
         grid.setWall(new Cell(0, 1), true);
         assertFalse(copy.isWall(new Cell(0, 1)));
     }
+
+    @Test
+    void weightsDefaultToOneAndCountTowardPathCost() {
+        Grid grid = Grid.parse("S5.E");
+        assertEquals(1, grid.weight(new Cell(0, 2)));
+        assertEquals(5, grid.weight(new Cell(0, 1)));
+        assertEquals(7, grid.pathCost(List.of(
+                new Cell(0, 0), new Cell(0, 1), new Cell(0, 2), new Cell(0, 3))));
+        assertTrue(grid.hasWeights());
+    }
+
+    @Test
+    void wallsAndWeightsReplaceEachOther() {
+        Grid grid = Grid.parse("S..E");
+        Cell cell = new Cell(0, 1);
+        grid.setWeight(cell, 4);
+        grid.setWall(cell, true);
+        assertEquals(1, grid.weight(cell));
+        grid.setWeight(cell, 3);
+        assertFalse(grid.isWall(cell));
+
+        grid.clearAll();
+        assertFalse(grid.hasWeights());
+    }
 }
