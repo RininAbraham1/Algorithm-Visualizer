@@ -2,6 +2,7 @@ package com.rinin.algoviz.ui;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import javafx.animation.AnimationTimer;
 
@@ -105,9 +106,26 @@ public final class StepPlayer<E> {
         onFrame.run();
     }
 
-    /** Shows exactly one step (used by the Step button while paused). */
+    /**
+     * Shows exactly one step (used by the Step button while paused). Waits
+     * briefly for the worker, since right after a start it may not have
+     * produced its first step yet.
+     */
     public void stepOnce() {
-        advance(1);
+        if (!running) {
+            return;
+        }
+        try {
+            E step = queue.poll(250, TimeUnit.MILLISECONDS);
+            if (step != null) {
+                applyStep.accept(step);
+            } else if (producerDone) {
+                finish();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        onFrame.run();
     }
 
     private void finish() {

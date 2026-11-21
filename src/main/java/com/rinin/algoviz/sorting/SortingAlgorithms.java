@@ -7,6 +7,7 @@ public final class SortingAlgorithms {
     private SortingAlgorithms() { }
 
     public static List<SortingAlgorithm> all() {
-        return List.of();
+        return List.of(
+                new BubbleSort());
     }
 }
