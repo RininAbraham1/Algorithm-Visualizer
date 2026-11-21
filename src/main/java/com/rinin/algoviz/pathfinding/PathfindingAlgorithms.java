@@ -10,6 +10,7 @@ public final class PathfindingAlgorithms {
         return List.of(
                 new BreadthFirstSearch(),
                 new DepthFirstSearch(),
-                new Dijkstra());
+                new Dijkstra(),
+                new AStar());
     }
 }
