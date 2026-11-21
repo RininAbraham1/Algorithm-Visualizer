@@ -9,6 +9,7 @@ public final class PathfindingAlgorithms {
     public static List<PathfindingAlgorithm> all() {
         return List.of(
                 new BreadthFirstSearch(),
-                new DepthFirstSearch());
+                new DepthFirstSearch(),
+                new Dijkstra());
     }
 }
