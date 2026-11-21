@@ -1,5 +1,6 @@
 package com.rinin.algoviz;
 
+import com.rinin.algoviz.ui.PathfindingView;
 import com.rinin.algoviz.ui.SortingView;
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -13,7 +14,8 @@ public class App extends Application {
     @Override
     public void start(Stage stage) {
         Tab sorting = new Tab("Sorting", new SortingView());
-        TabPane tabs = new TabPane(sorting);
+        Tab pathfinding = new Tab("Pathfinding", new PathfindingView());
+        TabPane tabs = new TabPane(sorting, pathfinding);
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
         Scene scene = new Scene(tabs, 1100, 700);
